@@ -27,7 +27,7 @@ void Serial_Init(void)
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);					//将PA10引脚初始化为上拉输入
-	
+	//
 	/*USART初始化*/
 	USART_InitTypeDef USART_InitStructure;					//定义结构体变量
 	USART_InitStructure.USART_BaudRate = 9600;				//波特率
