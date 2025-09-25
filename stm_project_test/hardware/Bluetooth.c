@@ -1,0 +1,108 @@
+#include "Bluetooth.h"
+#include "serial.h"
+#include "led.h"   // 假设你有 LED 控制函数
+
+
+#define FRAME_HEADER 0xAA
+#define FRAME_MAX_LEN 32
+
+static uint8_t rx_state = 0;
+static uint8_t rx_buf[FRAME_MAX_LEN];
+static uint8_t rx_len = 0;
+static uint8_t data_len = 0;
+static uint8_t cmd = 0;
+
+
+// 初始化蓝牙（实际上就是初始化USART）
+void Bluetooth_Init(void) {
+    Serial_Init();  // 调用你usart.c里的初始化
+}
+
+// 发送一个字节
+void Bluetooth_Send(uint8_t data) {
+    Serial_SendByte(data);  // 调用usart.c里的发送
+}
+
+// 处理接收到的数据（命令解析）
+void Bluetooth_Process(void){
+    while(Serial_Available()){
+        uint8_t byte = Serial_Read();
+
+        switch(rx_state){
+
+            case 0 :
+                if( byte == FRAME_HEADER){// 收到包头
+                    rx_len = 0;
+                    rx_state = 1;
+                    
+                }
+                break;
+
+            case 1 :      // 收到命令字
+                cmd = byte;
+                rx_len = 0;
+                rx_state = 2;
+                break;
+
+            case 2 :// 收到数据长度
+                data_len = byte;
+                if(data_len > FRAME_MAX_LEN){ // 4 = header + cmd + len + checksum
+                    // 长度错误，重置状态机
+                    rx_state = 0;
+                } else {
+                    rx_len = 0;
+                    if(data_len == 0){
+                        rx_state = 4; // 没有数据区，直接到校验和,原来的状态机设计有点问题
+                    } else{
+                    rx_state = 3;
+                    }
+                }
+                break;
+            
+            case 3 ://数据区
+                rx_buf[rx_len++] = byte;
+                if(rx_len >= data_len){
+                    rx_state = 4;
+                }
+                break;
+            
+            case 4 :// 校验和
+            {
+                uint8_t checksum = cmd + data_len;
+                for (uint8_t i = 0; i < data_len; i++)
+                    checksum += rx_buf[i];
+                checksum &= 0xFF;
+                
+                if (checksum == byte){
+                    // 校验通过，处理命令
+                    Bluetooth_ExecuteCommand(cmd, rx_buf, data_len);
+                }else{
+                    Serial_Printf("Checksum error\r\n");
+                    // 校验失败，丢弃数据
+                }
+                rx_state = 0;
+            }break;
+
+        }
+
+    }
+}
+
+void Bluetooth_ExecuteCommand(uint8_t cmd, uint8_t *data, uint8_t len){
+        switch (cmd) {
+        case 0x01: LED0_On();  Serial_Printf("LED0 ON\r\n"); break;
+        case 0x02: LED0_Off(); Serial_Printf("LED0 OFF\r\n"); break;
+        case 0x03: LED1_On();  Serial_Printf("LED1 ON\r\n"); break;
+        case 0x04: LED1_Off(); Serial_Printf("LED1 OFF\r\n"); break;
+        case 0x05: // 亮度控制例子
+            if (len >= 1) {
+                uint8_t brightness = data[0];
+                Serial_Printf("Set Brightness=%d\r\n", brightness);
+                // TODO: 这里写你的PWM调光函数
+            }
+            break;
+        default:
+            Serial_Printf("Unknown CMD: 0x%02X\r\n", cmd);
+            break;
+    }
+}

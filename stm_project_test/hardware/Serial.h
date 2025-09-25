@@ -13,4 +13,7 @@ void Serial_SendString(char *String);
 void Serial_SendNumber(uint32_t Number, uint8_t Length);
 void Serial_Printf(char *format, ...);
 
+uint8_t Serial_Available(void);
+uint8_t Serial_Read(void);
+void Serial_PushToBuffer(uint8_t byte);
 #endif
