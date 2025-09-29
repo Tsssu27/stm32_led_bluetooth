@@ -32,3 +32,11 @@ void LED1_On(void) {
 void LED1_Off(void) {
     GPIO_SetBits(GPIOA, GPIO_Pin_1);
 }
+
+uint8_t LED0_GetState(void) {
+    return (GPIO_ReadOutputDataBit(GPIOA, GPIO_Pin_0) == Bit_RESET) ? 1 : 0;
+}
+
+uint8_t LED1_GetState(void) {
+    return (GPIO_ReadOutputDataBit(GPIOA, GPIO_Pin_1) == Bit_RESET) ? 1 : 0;
+}

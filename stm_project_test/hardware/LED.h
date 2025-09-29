@@ -11,4 +11,6 @@ void LED0_Off(void);
 void LED1_On(void);
 void LED1_Off(void);
 
+uint8_t LED0_GetState(void);
+uint8_t LED1_GetState(void);
 #endif
