@@ -32,7 +32,7 @@ void Bluetooth_Process(void){
 
             case 0 :
                 if( byte == FRAME_HEADER){// 收到包头
-                    rx_len = 0;
+                    rx_len = 0;//rxlen是数据区长度，不是整个包长度
                     rx_state = 1;
                     
                 }
@@ -58,7 +58,8 @@ void Bluetooth_Process(void){
                     }
                 }
                 break;
-            
+            //为什么要这么多次执行rxlen=0？因为每次进入新的状态都要重新开始计数数据区长度
+            //否则会出错，比如先收到命令字，再收到数据长度，然后数据区长度就会变成2，而不是1
             case 3 ://数据区
                 rx_buf[rx_len++] = byte;
                 if(rx_len >= data_len){
@@ -88,12 +89,50 @@ void Bluetooth_Process(void){
     }
 }
 
+// ================== 新增：ACK/NACK 发送函数 ==================
+void Bluetooth_SendAck(uint8_t cmd) {
+    uint8_t buf[5];
+    uint8_t checksum = 0;
+
+    buf[0] = FRAME_HEADER; // 0xAA
+    buf[1] = 0x80;         // ACK 命令字
+    buf[2] = 0x01;         // 数据长度 = 1
+    buf[3] = cmd;          // 回复原始命令字
+
+    checksum = buf[1] + buf[2] + buf[3];
+    buf[4] = checksum;
+
+    for (int i = 0; i < 5; i++) {
+        Serial_SendByte(buf[i]);
+    }
+}
+
+void Bluetooth_SendNack(uint8_t errorCode) {
+    uint8_t buf[5];
+    uint8_t checksum = 0;
+
+    buf[0] = FRAME_HEADER; // 0xAA
+    buf[1] = 0x81;         // NACK 命令字
+    buf[2] = 0x01;         // 数据长度 = 1
+    buf[3] = errorCode;    // 错误码
+
+    checksum = buf[1] + buf[2] + buf[3];
+    buf[4] = checksum;
+
+    for (int i = 0; i < 5; i++) {
+        Serial_SendByte(buf[i]);
+    }
+}
+
+
+
+
 void Bluetooth_ExecuteCommand(uint8_t cmd, uint8_t *data, uint8_t len){
         switch (cmd) {
-        case 0x01: LED0_On();  Serial_Printf("LED0 ON\r\n"); break;
-        case 0x02: LED0_Off(); Serial_Printf("LED0 OFF\r\n"); break;
-        case 0x03: LED1_On();  Serial_Printf("LED1 ON\r\n"); break;
-        case 0x04: LED1_Off(); Serial_Printf("LED1 OFF\r\n"); break;
+        case 0x01: LED0_On();  Serial_Printf("LED0 ON\r\n");Bluetooth_SendAck(cmd); break;
+        case 0x02: LED0_Off(); Serial_Printf("LED0 OFF\r\n");Bluetooth_SendAck(cmd); break;
+        case 0x03: LED1_On();  Serial_Printf("LED1 ON\r\n"); Bluetooth_SendAck(cmd);break;
+        case 0x04: LED1_Off(); Serial_Printf("LED1 OFF\r\n");Bluetooth_SendAck(cmd); break;
         case 0x05: // 亮度控制例子
             if (len >= 1) {
                 uint8_t brightness = data[0];
@@ -103,6 +142,7 @@ void Bluetooth_ExecuteCommand(uint8_t cmd, uint8_t *data, uint8_t len){
             break;
         default:
             Serial_Printf("Unknown CMD: 0x%02X\r\n", cmd);
+            Bluetooth_SendNack(0x02); // 发送 NACK，错误码 0x02 表示未知命令
             break;
     }
 }
