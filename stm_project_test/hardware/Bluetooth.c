@@ -1,7 +1,8 @@
 #include "Bluetooth.h"
 #include "serial.h"
 #include "led.h"   // 假设你有 LED 控制函数
-
+#include "motor.h"
+#include "pwm.h"
 
 #define FRAME_HEADER 0xAA
 #define FRAME_MAX_LEN 32
@@ -165,21 +166,25 @@ void Bluetooth_SendStatus(uint8_t s, uint8_t led0, uint8_t led1, uint8_t brightn
 void Bluetooth_ExecuteCommand(uint8_t cmd, uint8_t seq, uint8_t *data, uint8_t len) {
     switch (cmd) {
         case 0x01: // LED0 ON
-            LED0_On();
-            Serial_Printf("LED0 ON\r\n");
+            //LED0_On();
+             Motor_RunForward();
+            
+            Serial_Printf("Forward\r\n");
             Bluetooth_SendAck(seq);
-            Bluetooth_SendStatus(seq,LED0_GetState(),LED1_GetState(),50); // 发送状态更新
+            //Bluetooth_SendStatus(seq,LED0_GetState(),LED1_GetState(),50); // 发送状态更新
             break;
 
         case 0x02: // LED0 OFF
-            LED0_Off();
-            Serial_Printf("LED0 OFF\r\n");
+            //LED0_Off();
+            Motor_RunBackward();
+            Serial_Printf("Back\r\n");
             Bluetooth_SendAck(seq);
             break;
 
         case 0x03: // LED1 ON
-            LED1_On();
-            Serial_Printf("LED1 ON\r\n");
+            //LED1_On();
+            Motor_Stop();
+            Serial_Printf("stop\r\n");
             Bluetooth_SendAck(seq);
             break;
 
@@ -189,16 +194,19 @@ void Bluetooth_ExecuteCommand(uint8_t cmd, uint8_t seq, uint8_t *data, uint8_t l
             Bluetooth_SendAck(seq);
             break;
 
-        case 0x05: // 亮度控制，data[0] = 0..100
-            if (len >= 1) {
-                uint8_t brightness = data[0];
-                // TODO: PWM_SetBrightness(brightness);
-                Serial_Printf("Set Brightness=%d\r\n", brightness);
-                Bluetooth_SendAck(seq);
-            } else {
-                Bluetooth_SendNack(seq, ERR_LEN);
-            }
-            break;
+       // 在 Bluetooth_ExecuteCommand 里修改 case 0x05
+case 0x05: // 速度控制，data[0] = 0..100
+    if (len >= 1) {
+        uint8_t speed = data[0]; // 0-100
+        uint16_t compare = speed * 10; // 100 -> 1000 (周期为1000)
+        PWM_SetCompare1(compare); // 设置占空比
+        Serial_Printf("Set Speed=%d\r\n", speed);
+        Bluetooth_SendAck(seq);
+    } else {
+        Bluetooth_SendNack(seq, ERR_LEN);
+    }
+    break;
+
 
         default:
             Serial_Printf("Unknown CMD: 0x%02X\r\n", cmd);
